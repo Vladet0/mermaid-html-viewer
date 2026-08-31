@@ -1,0 +1,20 @@
+{
+  "name": "markdown-mermaid-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Read-only Markdown viewer with Mermaid diagram support",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "markdown-it": "^14.1.0",
+    "mermaid": "^11.4.1",
+    "sanitize-html": "^2.14.0"
+  }
+}
