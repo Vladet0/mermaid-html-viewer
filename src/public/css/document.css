@@ -247,6 +247,12 @@ main {
   height: auto;
 }
 
+.markdown-body pre.mermaid-failed {
+  display: block;
+  color: #9b1c1c;
+  white-space: pre-wrap;
+}
+
 .markdown-body table {
   border-collapse: collapse;
   display: block;

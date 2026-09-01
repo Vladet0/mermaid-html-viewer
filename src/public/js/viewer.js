@@ -9,6 +9,18 @@ const closeButton = document.getElementById("close-preview");
 let mermaidLoader = null;
 let dragDepth = 0;
 
+function mermaidConfig() {
+  return {
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme: "neutral",
+    suppressErrorRendering: false,
+    flowchart: { htmlLabels: true, useMaxWidth: true },
+    sequence: { useMaxWidth: true },
+    gantt: { useMaxWidth: true },
+  };
+}
+
 function loadMermaid() {
   if (window.mermaid) {
     return Promise.resolve(window.mermaid);
@@ -17,7 +29,10 @@ function loadMermaid() {
     mermaidLoader = new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.src = "/vendor/mermaid.min.js";
-      script.onload = () => resolve(window.mermaid);
+      script.onload = () => {
+        window.mermaid.initialize(mermaidConfig());
+        resolve(window.mermaid);
+      };
       script.onerror = () => reject(new Error("Could not load the Mermaid library"));
       document.head.appendChild(script);
     });
@@ -26,12 +41,27 @@ function loadMermaid() {
 }
 
 async function renderDiagrams() {
-  if (document.querySelectorAll("pre.mermaid:not([data-processed])").length === 0) {
+  const nodes = [...document.querySelectorAll("pre.mermaid:not([data-processed])")];
+  if (nodes.length === 0) {
     return;
   }
   const mermaid = await loadMermaid();
-  mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "neutral" });
-  await mermaid.run({ querySelector: "pre.mermaid:not([data-processed])" });
+  try {
+    await mermaid.run({ nodes, suppressErrors: true });
+  } catch (error) {
+    console.error("Mermaid rendering failed", error);
+  }
+
+  const leftover = [...document.querySelectorAll("pre.mermaid:not([data-processed])")];
+  for (const node of leftover) {
+    try {
+      await mermaid.run({ nodes: [node], suppressErrors: true });
+    } catch (error) {
+      console.error("Mermaid diagram failed", error);
+      node.setAttribute("data-processed", "true");
+      node.classList.add("mermaid-failed");
+    }
+  }
 }
 
 function setStatus(text) {
