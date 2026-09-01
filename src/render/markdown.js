@@ -27,13 +27,32 @@ function decodeNumericEntity(_, hex, decimal) {
   }
 }
 
+function separateInlineDirectionComment(source) {
+  // `graph TD%% comment` is valid-looking GitHub example text, but Mermaid 11
+  // requires a newline between the direction and the comment.
+  return source.replace(/^((?:graph|flowchart)\s+(?:TD|TB|BT|LR|RL))\s*%%/imu, "$1\n%%");
+}
+
+function rewriteLegacyGitGraph(source) {
+  if (!/^\s*gitGraph/iu.test(source)) {
+    return source;
+  }
+
+  let next = source.replace(/^\s*gitGraph:\s*/iu, "gitGraph\n");
+  next = next.replace(/\noptions\s*\{[\s\S]*?\}\s*end\s*/iu, "\n");
+  if (!/\bbranch\s+master\b/iu.test(next)) {
+    next = next.replace(/\b(checkout|switch|merge)\s+master\b/giu, "$1 main");
+  }
+  return next;
+}
+
 /**
  * Mermaid is picky about source text. Windows files often use CRLF, and copies
- * of GitHub examples frequently contain HTML entities and leftover Markdown
- * backslash-escapes inside the fence (`\[Label]`, `&#x20;`, `\&`).
+ * of GitHub examples frequently contain HTML entities, leftover Markdown
+ * backslash-escapes, and pre-Mermaid-10 gitGraph syntax.
  */
 export function normalizeMermaidSource(source) {
-  return source
+  const cleaned = source
     .replaceAll("\r\n", "\n")
     .replaceAll("\r", "\n")
     .replace(MARKDOWN_ESCAPES, "$1")
@@ -44,6 +63,7 @@ export function normalizeMermaidSource(source) {
     .replaceAll("&gt;", ">")
     .replaceAll("&quot;", '"')
     .replaceAll("&nbsp;", " ");
+  return rewriteLegacyGitGraph(separateInlineDirectionComment(cleaned));
 }
 
 md.renderer.rules.fence = (tokens, idx, options, env, slf) => {
