@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "express": "^4.22.3",
-    "markdown-it": "^14.1.0",
+    "markdown-it": "^15.0.2",
     "mermaid": "^11.4.1",
     "sanitize-html": "^2.14.0"
   }
