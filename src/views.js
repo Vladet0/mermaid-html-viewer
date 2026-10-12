@@ -1,24 +1,19 @@
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
+import { escapeHtml } from "./html.js";
 
+// title and pathLabel must already be HTML-escaped by the caller.
 function layout({ title, body, pathLabel = "", scripts = "" }) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)}</title>
+  <title>${title}</title>
   <link rel="stylesheet" href="/css/document.css">
 </head>
 <body>
   <header class="chrome">
     <a class="chrome-brand" href="/">Markdown viewer</a>
-    <p class="chrome-path" id="chrome-path">${escapeHtml(pathLabel)}</p>
+    <p class="chrome-path" id="chrome-path">${pathLabel}</p>
     <button type="button" class="chrome-action" id="close-preview" hidden>Close preview</button>
   </header>
   <main id="viewer-main">
@@ -35,6 +30,7 @@ function layout({ title, body, pathLabel = "", scripts = "" }) {
 
 export function renderDocumentPage({ title, pathLabel, html }) {
   return layout({
+    // title and pathLabel are escaped by the caller.
     title,
     pathLabel,
     body: `<article class="markdown-body">${html}</article>`,
@@ -61,7 +57,7 @@ export function renderIndexPage(files) {
   </section>`;
 
   return layout({
-    title: "Markdown viewer",
+    title: escapeHtml("Markdown viewer"),
     body: `<section class="splash">
   <h1>Markdown viewer</h1>
   <p class="splash-lead">Markdown rendered as HTML, with <code>mermaid</code> blocks drawn as diagrams.</p>
@@ -78,7 +74,7 @@ export function renderIndexPage(files) {
 
 export function renderErrorPage({ status, message }) {
   return layout({
-    title: `Error ${status}`,
+    title: escapeHtml(`Error ${status}`),
     body: `<article class="markdown-body">
   <h1>Error ${escapeHtml(status)}</h1>
   <p>${escapeHtml(message)}</p>
