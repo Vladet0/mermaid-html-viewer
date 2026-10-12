@@ -10,6 +10,13 @@ import { renderDocumentPage, renderErrorPage, renderIndexPage } from "./views.js
 const mermaidDist = path.join(APP_ROOT, "node_modules/mermaid/dist/mermaid.min.js");
 const MAX_DROPPED_FILE_SIZE = "2mb";
 
+function splatToPath(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).join("/");
+  }
+  return typeof value === "string" ? value : "";
+}
+
 function setSecurityHeaders(_req, res, next) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -80,9 +87,9 @@ export function createApp(appConfig = config) {
       }
     });
 
-    app.get("/docs/:repository/:branch/*", async (req, res, next) => {
+    app.get("/docs/:repository/:branch/*filePath", async (req, res, next) => {
       try {
-        const filePath = req.params[0];
+        const filePath = splatToPath(req.params.filePath);
         const { repository, branch } = req.params;
         const { markdown } = await source.get({ repository, branch, filePath });
         sendDocument(res, {

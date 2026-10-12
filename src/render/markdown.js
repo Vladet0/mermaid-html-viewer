@@ -28,7 +28,7 @@ function decodeNumericEntity(_, hex, decimal) {
 }
 
 function separateInlineDirectionComment(source) {
-  // `graph TD%% comment` is valid-looking GitHub example text, but Mermaid 11
+  // `graph TD%% comment` is valid-looking GitHub example text, but Mermaid 11+
   // requires a newline between the direction and the comment.
   return source.replace(/^((?:graph|flowchart)\s+(?:TD|TB|BT|LR|RL))\s*%%/imu, "$1\n%%");
 }
