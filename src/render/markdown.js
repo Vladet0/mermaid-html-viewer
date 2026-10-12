@@ -46,23 +46,39 @@ function rewriteLegacyGitGraph(source) {
   return next;
 }
 
+const NAMED_ENTITIES = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  nbsp: " ",
+};
+
+/**
+ * Decode a single level of HTML entities in one pass so `&amp;lt;` stays `&lt;`
+ * instead of becoming `<`.
+ */
+function decodeHtmlEntities(source) {
+  return source.replace(
+    /&(?:#x([0-9a-fA-F]+)|#(\d+)|(amp|lt|gt|quot|nbsp));/gi,
+    (match, hex, decimal, name) => {
+      if (name) {
+        return NAMED_ENTITIES[name.toLowerCase()] ?? match;
+      }
+      return decodeNumericEntity(match, hex, decimal);
+    },
+  );
+}
+
 /**
  * Mermaid is picky about source text. Windows files often use CRLF, and copies
  * of GitHub examples frequently contain HTML entities, leftover Markdown
  * backslash-escapes, and pre-Mermaid-10 gitGraph syntax.
  */
 export function normalizeMermaidSource(source) {
-  const cleaned = source
-    .replaceAll("\r\n", "\n")
-    .replaceAll("\r", "\n")
-    .replace(MARKDOWN_ESCAPES, "$1")
-    .replace(/&#x([0-9a-fA-F]+);/giu, (match, hex) => decodeNumericEntity(match, hex, undefined))
-    .replace(/&#(\d+);/gu, (match, decimal) => decodeNumericEntity(match, undefined, decimal))
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&nbsp;", " ");
+  const cleaned = decodeHtmlEntities(
+    source.replaceAll("\r\n", "\n").replaceAll("\r", "\n").replace(MARKDOWN_ESCAPES, "$1"),
+  );
   return rewriteLegacyGitGraph(separateInlineDirectionComment(cleaned));
 }
 
@@ -80,9 +96,14 @@ export function renderMarkdown(markdown) {
 }
 
 export function extractTitle(markdown, fallback) {
-  const match = markdown.match(/^#\s+(.+)$/mu);
-  if (!match) {
-    return fallback;
+  for (const line of markdown.split("\n")) {
+    if (!line.startsWith("# ") && !line.startsWith("#\t")) {
+      continue;
+    }
+    const title = line.slice(2).trim();
+    if (title !== "") {
+      return title;
+    }
   }
-  return match[1].trim();
+  return fallback;
 }

@@ -1,7 +1,9 @@
 import express from "express";
+import { rateLimit } from "express-rate-limit";
 import path from "node:path";
 import { APP_ROOT, config } from "./config.js";
 import { AppError } from "./errors.js";
+import { escapeHtml } from "./html.js";
 import { extractTitle, renderMarkdown } from "./render/markdown.js";
 import { sanitizeRenderedHtml } from "./render/sanitize.js";
 import { createMarkdownSource } from "./sources/createSource.js";
@@ -44,11 +46,43 @@ function sendDocument(res, { markdown, fallbackTitle, pathLabel }) {
   const html = sanitizeRenderedHtml(renderMarkdown(markdown));
   res.type("html").send(
     renderDocumentPage({
-      title: extractTitle(markdown, fallbackTitle),
-      pathLabel,
+      title: escapeHtml(extractTitle(markdown, fallbackTitle)),
+      pathLabel: escapeHtml(pathLabel),
       html,
     }),
   );
+}
+
+function sendRateLimited(req, res, _next, options) {
+  const status = options.statusCode;
+  const message = "Too many requests, try again shortly.";
+  if (req.path === "/render") {
+    res.status(status).json({ error: message });
+    return;
+  }
+  res.status(status).type("html").send(renderErrorPage({ status, message }));
+}
+
+function createReadLimiter() {
+  return rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: sendRateLimited,
+    validate: { xForwardedForHeader: false },
+  });
+}
+
+function createRenderLimiter() {
+  return rateLimit({
+    windowMs: 60_000,
+    limit: 40,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: sendRateLimited,
+    validate: { xForwardedForHeader: false },
+  });
 }
 
 export function createApp(appConfig = config) {
@@ -56,16 +90,17 @@ export function createApp(appConfig = config) {
   const app = express();
   app.disable("x-powered-by");
   app.use(setSecurityHeaders);
+  const readLimiter = createReadLimiter();
   app.use("/css", express.static(path.join(APP_ROOT, "src/public/css"), { index: false }));
   app.use("/js", express.static(path.join(APP_ROOT, "src/public/js"), { index: false }));
-  app.get("/vendor/mermaid.min.js", (_req, res) => {
+  app.get("/vendor/mermaid.min.js", readLimiter, (_req, res) => {
     res.type("application/javascript");
     res.sendFile(mermaidDist);
   });
 
   if (appConfig.singleFile) {
     const fileName = path.basename(appConfig.singleFile);
-    app.get("/", async (_req, res, next) => {
+    app.get("/", readLimiter, async (_req, res, next) => {
       try {
         const { markdown } = await source.get();
         sendDocument(res, {
@@ -78,7 +113,7 @@ export function createApp(appConfig = config) {
       }
     });
   } else {
-    app.get("/", async (_req, res, next) => {
+    app.get("/", readLimiter, async (_req, res, next) => {
       try {
         const files = await source.list();
         res.type("html").send(renderIndexPage(files));
@@ -87,7 +122,7 @@ export function createApp(appConfig = config) {
       }
     });
 
-    app.get("/docs/:repository/:branch/*filePath", async (req, res, next) => {
+    app.get("/docs/:repository/:branch/*filePath", readLimiter, async (req, res, next) => {
       try {
         const filePath = splatToPath(req.params.filePath);
         const { repository, branch } = req.params;
@@ -105,6 +140,7 @@ export function createApp(appConfig = config) {
 
   app.post(
     "/render",
+    createRenderLimiter(),
     express.text({ type: "*/*", limit: MAX_DROPPED_FILE_SIZE }),
     (req, res, next) => {
       try {
